@@ -7,6 +7,9 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 import java.util.Random;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+
 @Service
 public class UrlService {
 
@@ -27,8 +30,33 @@ public class UrlService {
         return sb.toString();
     }
 
+    // Validate the URL format
+    private boolean isValidUrl(String url) {
+        try {
+            new URL(url); // tries parsing, throws exception if invalid
+            return true;
+        } catch (MalformedURLException e) {
+            return false;
+        }
+    }
+
     // Save new URL with short code
     public Url shortenUrl(String originalUrl) {
+        // Validation
+        if (originalUrl == null || !isValidUrl(originalUrl)) {
+            throw new IllegalArgumentException("Invalid URL provided");
+        }
+
+        //Duplicate check
+        Optional<Url> existing = urlRepository.findAll().stream()
+                .filter(u -> u.getOriginalUrl().equals(originalUrl))
+                .findFirst();
+
+        if (existing.isPresent()) {
+            return existing.get(); // return existing short code
+        }
+
+        // Otherwise generate a new short code
         String shortCode = generateShortCode();
         Url url = new Url(originalUrl, shortCode);
         return urlRepository.save(url);

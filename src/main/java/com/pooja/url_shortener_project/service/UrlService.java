@@ -32,6 +32,9 @@ public class UrlService {
 
     // Validate the URL format
     private boolean isValidUrl(String url) {
+        if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) {
+            return false;
+        }
         try {
             new URL(url); // tries parsing, throws exception if invalid
             return true;
@@ -41,7 +44,7 @@ public class UrlService {
     }
 
     // Save new URL with short code
-    public Url shortenUrl(String originalUrl) {
+    public ShortenResult shortenUrl(String originalUrl) {
         // Validation
         if (originalUrl == null || !isValidUrl(originalUrl)) {
             throw new IllegalArgumentException("Invalid URL provided");
@@ -53,13 +56,16 @@ public class UrlService {
                 .findFirst();
 
         if (existing.isPresent()) {
-            return existing.get(); // return existing short code
+            //return existing.get(); // return existing short code
+            return new ShortenResult(existing.get(), false); // not new
         }
 
         // Otherwise generate a new short code
         String shortCode = generateShortCode();
         Url url = new Url(originalUrl, shortCode);
-        return urlRepository.save(url);
+        Url saved = urlRepository.save(url);
+        //return urlRepository.save(url);
+        return new ShortenResult(saved,true);
     }
 
     // Retrieve original URL from short code

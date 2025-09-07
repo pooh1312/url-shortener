@@ -1,6 +1,7 @@
 package com.pooja.url_shortener_project.controller;
 
 import com.pooja.url_shortener_project.model.Url;
+import com.pooja.url_shortener_project.service.ShortenResult;
 import com.pooja.url_shortener_project.service.UrlService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +26,24 @@ public class UrlController {
         String originalUrl = request.get("url");
 
         try{
-            Url url = urlService.shortenUrl(originalUrl);
+            ShortenResult result = urlService.shortenUrl(originalUrl);
+            Url url = result.getUrl();
 
-            return ResponseEntity.ok(Map.of(
+            Map<String, String> response = Map.of(
                     "originalUrl", url.getOriginalUrl(),
                     "shortCode", url.getShortCode(),
                     "shortenedUrl", "http://localhost:8080/api/" + url.getShortCode()
-            ));
+            );
+
+            if (result.isNew()) {
+                // brand new → 201 Created
+                return ResponseEntity.created(URI.create("/api/" + url.getShortCode()))
+                        .body(response);
+            } else {
+                // already existed → 200 OK
+                return ResponseEntity.ok(response);
+            }
+
         } catch (IllegalArgumentException e){
             //Handle invalid URL error
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

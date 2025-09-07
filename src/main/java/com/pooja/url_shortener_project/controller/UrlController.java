@@ -23,18 +23,27 @@ public class UrlController {
     @PostMapping("/shorten")
     public ResponseEntity<Map<String, String>> shortenUrl(@RequestBody Map<String, String> request) {
         String originalUrl = request.get("url");
-        Url url = urlService.shortenUrl(originalUrl);
 
-        return ResponseEntity.ok(Map.of(
-                "originalUrl", url.getOriginalUrl(),
-                "shortCode", url.getShortCode(),
-                "shortenedUrl", "http://localhost:8080/api/" + url.getShortCode()
-        ));
+        try{
+            Url url = urlService.shortenUrl(originalUrl);
+
+            return ResponseEntity.ok(Map.of(
+                    "originalUrl", url.getOriginalUrl(),
+                    "shortCode", url.getShortCode(),
+                    "shortenedUrl", "http://localhost:8080/api/" + url.getShortCode()
+            ));
+        } catch (IllegalArgumentException e){
+            //Handle invalid URL error
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e){
+            //Catch-all for unexpected issues
+            return ResponseEntity.internalServerError().body(Map.of("error","Something went wrong"));
+        }
     }
 
     // 2. GET /{shortCode} -> redirect to original URL
     @GetMapping("/{shortCode}")
-    public ResponseEntity<Void> redirect(@PathVariable String shortCode) {
+    public ResponseEntity<Object> redirect(@PathVariable String shortCode) {
         Optional<Url> urlOptional = urlService.getOriginalUrl(shortCode);
 
         if (urlOptional.isPresent()) {
@@ -42,7 +51,8 @@ public class UrlController {
                     .location(URI.create(urlOptional.get().getOriginalUrl()))
                     .build();
         } else {
-            return ResponseEntity.notFound().build();
+            //return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(Map.of("error", "Short URL not found"));
         }
     }
 }

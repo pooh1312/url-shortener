@@ -22,17 +22,26 @@ public class UrlController {
 
     // 1. POST /shorten  -> shorten a long URL
     @PostMapping("/shorten")
-    public ResponseEntity<Map<String, String>> shortenUrl(@RequestBody Map<String, String> request) {
-        String originalUrl = request.get("url");
+    public ResponseEntity<Map<String, String>> shortenUrl(@RequestBody Map<String, Object> request) {
+        String originalUrl = (String) request.get("url");
+
+        // optional expiry input
+        Integer expiryInSeconds = null;
+        if (request.containsKey("expiryInSeconds")) {
+            expiryInSeconds = (Integer) request.get("expiryInSeconds");
+        }
 
         try{
-            ShortenResult result = urlService.shortenUrl(originalUrl);
+            ShortenResult result = urlService.shortenUrl(originalUrl, expiryInSeconds);
             Url url = result.getUrl();
 
             Map<String, String> response = Map.of(
                     "originalUrl", url.getOriginalUrl(),
                     "shortCode", url.getShortCode(),
-                    "shortenedUrl", "http://localhost:8080/api/" + url.getShortCode()
+                    "shortenedUrl", "http://localhost:8080/api/" + url.getShortCode(),
+                    "createdAt", url.getCreatedAt().toString(),
+                    "expiryAt", url.getExpiryAt() != null ? url.getExpiryAt().toString() : "Never"
+
             );
 
             if (result.isNew()) {
@@ -64,7 +73,7 @@ public class UrlController {
                     .build();
         } else {
             //return ResponseEntity.notFound().build();
-            return ResponseEntity.status(404).body(Map.of("error", "Short URL not found"));
+            return ResponseEntity.status(404).body(Map.of("error", "Short URL not found or expired"));
         }
     }
 }

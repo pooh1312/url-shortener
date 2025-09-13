@@ -2,8 +2,10 @@ package com.pooja.url_shortener_project.service;
 
 import com.pooja.url_shortener_project.model.Url;
 import com.pooja.url_shortener_project.repository.UrlRepository;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Random;
@@ -15,10 +17,12 @@ import java.net.URL;
 public class UrlService {
 
     private final UrlRepository urlRepository;
+    private final RedisTemplate<String, String> redisTemplate; // Redis
     private final Random random = new Random();
 
-    public UrlService(UrlRepository urlRepository) {
+    public UrlService(UrlRepository urlRepository,RedisTemplate<String, String> redisTemplate) {
         this.urlRepository = urlRepository;
+        this.redisTemplate = redisTemplate;
     }
 
     // Method to generate short code
@@ -73,12 +77,24 @@ public class UrlService {
         Url url = new Url(originalUrl, shortCode, createdAt, expiryAt);
         Url saved = urlRepository.save(url);
 
+        // Add to Redis cache
+        redisTemplate.opsForValue().set(shortCode, originalUrl, Duration.ofHours(1));
+
+
         //return urlRepository.save(url);
         return new ShortenResult(saved,true);
     }
 
     // Retrieve original URL from short code (with expiry check)
     public Optional<Url> getOriginalUrl(String shortCode) {
+        // 1️⃣ Check Redis first
+        String cachedUrl = redisTemplate.opsForValue().get(shortCode);
+        if (cachedUrl != null) {
+            Url url = new Url(cachedUrl, shortCode, null, null); // dummy createdAt/expiry for Redis hits
+            return Optional.of(url);
+        }
+
+        // 2️⃣ If not in cache, check DB
         //return urlRepository.findByShortCode(shortCode);
         Optional<Url> urlOpt = urlRepository.findByShortCode(shortCode);
         if (urlOpt.isPresent()) {
@@ -88,7 +104,10 @@ public class UrlService {
                 urlRepository.delete(url);
                 return Optional.empty();
             }
+            // 3️⃣ Store in Redis for future requests
+            redisTemplate.opsForValue().set(shortCode, url.getOriginalUrl(), Duration.ofHours(1));
             return Optional.of(url);
+
         }
         return Optional.empty();
     }
